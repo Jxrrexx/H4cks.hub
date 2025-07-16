@@ -329,240 +329,141 @@ local RefreshKidsBtn = KidsTab:CreateButton({
     end,
 })
 
-local HUNGER_FULL_VALUE = 180 -- value representing full hunger
-
-local hungerTask
-local AutoHungerToggle = PlayerTab:CreateToggle({
-    Name = "Auto Fill Hunger",
-    CurrentValue = false,
-    Flag = "AutoHunger",
-    Callback = function(state)
-        if state then
-            if hungerTask then task.cancel(hungerTask) end
-            hungerTask = task.spawn(function()
-                while true do
-                    local attr = LocalPlayer:GetAttribute("Hunger")
-                    if attr ~= nil then
-                        LocalPlayer:SetAttribute("Hunger", HUNGER_FULL_VALUE)
-                    end
-                    task.wait(1)
-                end
-            end)
-        else
-            if hungerTask then
-                task.cancel(hungerTask)
-                hungerTask = nil
-            end
-        end
-    end,
-})
-
--- Remove Combat tab and Kill Aura
--- Add ESP for all items and all entities (enemies/NPCs) with distance display
-
--- ESP utility (now supports both Item and Entity ESP at the same time)
-local itemEspParts = {}
-local entityEspParts = {}
-local itemEspUpdateTask
-local entityEspUpdateTask
-
-local function clearItemESP()
-    if itemEspUpdateTask then
-        task.cancel(itemEspUpdateTask)
-        itemEspUpdateTask = nil
-    end
-    for _, rec in ipairs(itemEspParts) do
-        if rec.part and rec.part.Parent then
-            rec.part:Destroy()
-        end
-    end
-    table.clear(itemEspParts)
-end
-
-local function clearEntityESP()
-    if entityEspUpdateTask then
-        task.cancel(entityEspUpdateTask)
-        entityEspUpdateTask = nil
-    end
-    for _, rec in ipairs(entityEspParts) do
-        if rec.part and rec.part.Parent then
-            rec.part:Destroy()
-        end
-    end
-    table.clear(entityEspParts)
-end
-
-local function createESPAt(partsTable, name, pos, color)
-    local part = Instance.new("Part")
-    part.Anchored = true
-    part.CanCollide = false
-    part.Size = Vector3.new(1,1,1)
-    part.Transparency = 1
-    part.Position = pos + Vector3.new(0,2,0)
-    part.Parent = workspace
-
-    local bill = Instance.new("BillboardGui")
-    bill.Size = UDim2.new(0,120,0,30)
-    bill.AlwaysOnTop = true
-    bill.Adornee = part
-    bill.Parent = part
-
-    local text = Instance.new("TextLabel")
-    text.Size = UDim2.new(1,0,1,0)
-    text.BackgroundTransparency = 1
-    text.TextColor3 = color or Color3.new(1,1,0)
-    text.TextScaled = true
-    text.Font = Enum.Font.SourceSansBold
-    text.Parent = bill
-
-    table.insert(partsTable, {part = part, name = name, label = text})
-end
-
--- ESP for Items
-local ItemsFolder = workspace:FindFirstChild("Items") or workspace
-local function getItemModels()
-    local models = {}
-    for _, child in ipairs(ItemsFolder:GetDescendants()) do
-        if child:IsA("Model") or child:IsA("BasePart") then
-            table.insert(models, child)
-        end
-    end
-    return models
-end
-
--- ESP for Entities (enemies/NPCs)
-local function getEntityModels()
-    local charsFolder = workspace:FindFirstChild("Characters") or workspace
-    local models = {}
-    for _, child in ipairs(charsFolder:GetDescendants()) do
-        if child:IsA("Model") and child:FindFirstChildWhichIsA("Humanoid", true) then
-            table.insert(models, child)
-        end
-    end
-    return models
-end
-
--- BEGIN NEW ESP TAB SECTION ----------------------------------------------
-local ESPTab = Window:CreateTab("ESP", "eye")
-
--- helper to get unique entity names
-local function getEntityNames()
-    local seen, list = {}, {}
-    for _, ent in ipairs(getEntityModels()) do
-        if not seen[ent.Name] then
-            seen[ent.Name] = true
-            table.insert(list, ent.Name)
-        end
-    end
-    table.sort(list)
-    return list
-end
-
--- selections
-local selectedItemESP, selectedEntityESP = {}, {}
-
--- Remove ItemEspDropdown and Refresh Item List button
--- (Dropdown and refresh button deleted)
-
--- Remove EntityEspDropdown and Refresh Entity List button
--- (Dropdown and button deleted)
--- Remove spawnSelectedEntityESP function
--- (Function deleted)
-
--- Rewrite the Entity ESP toggle to display all entities
-ESPTab:CreateToggle({
-    Name = "Entity ESP (All)",
-    CurrentValue = false,
-    Flag = "EnableEntityESP",
-    Callback = function(state)
-        clearEntityESP()
-        if state then
-            for _, ent in ipairs(getEntityModels()) do
-                local part = ent:FindFirstChild("HumanoidRootPart", true) or ent.PrimaryPart or ent:FindFirstChildWhichIsA("BasePart", true)
-                if part then
-                    createESPAt(entityEspParts, ent.Name, part.Position, Color3.new(1,0,0))
-                end
-            end
-            entityEspUpdateTask = task.spawn(function()
-                while #entityEspParts > 0 do
-                    local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-                    for i = #entityEspParts, 1, -1 do
-                        local rec = entityEspParts[i]
-                        local ent = workspace:FindFirstChild(rec.name, true)
-                        local part = ent and (ent:FindFirstChild("HumanoidRootPart", true) or ent.PrimaryPart or ent:FindFirstChildWhichIsA("BasePart", true))
-                        local pos = part and part.Position
-                        if pos and rec.part and rec.part.Parent then
-                            rec.part.Position = pos + Vector3.new(0,2,0)
-                            if hrp then
-                                rec.label.Text = string.format("%s [%.0f]", rec.name, (hrp.Position - pos).Magnitude)
-                            else
-                                rec.label.Text = rec.name
-                            end
-                        else
-                            if rec.part and rec.part.Parent then rec.part:Destroy() end
-                            table.remove(entityEspParts, i)
-                        end
-                    end
-                    task.wait(0.5)
-                end
-                clearEntityESP()
-            end)
-        end
-    end,
-})
--- Add Item ESP (All) toggle
-ESPTab:CreateToggle({
-    Name = "Item ESP (All)",
-    CurrentValue = false,
-    Flag = "EnableItemESP",
-    Callback = function(state)
-        clearItemESP()
-        if state then
-            for _, mdl in ipairs(getItemModels()) do
-                local pos = mdl:IsA("Model") and ((mdl.PrimaryPart and mdl.PrimaryPart.Position) or (mdl:FindFirstChildWhichIsA("BasePart") and mdl:FindFirstChildWhichIsA("BasePart").Position)) or mdl.Position
-                if pos then
-                    createESPAt(itemEspParts, mdl.Name, pos, Color3.new(0,1,0))
-                end
-            end
-            itemEspUpdateTask = task.spawn(function()
-                while #itemEspParts > 0 do
-                    local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-                    for i = #itemEspParts, 1, -1 do
-                        local rec = itemEspParts[i]
-                        local item = ItemsFolder:FindFirstChild(rec.name, true)
-                        local pos = item and (item:IsA("Model") and ((item.PrimaryPart and item.PrimaryPart.Position) or (item:FindFirstChildWhichIsA("BasePart") and item:FindFirstChildWhichIsA("BasePart").Position)) or item.Position)
-                        if pos and rec.part and rec.part.Parent then
-                            rec.part.Position = pos + Vector3.new(0,2,0)
-                            if hrp then
-                                rec.label.Text = string.format("%s [%.0f]", rec.name, (hrp.Position - pos).Magnitude)
-                            else
-                                rec.label.Text = rec.name
-                            end
-                        else
-                            if rec.part and rec.part.Parent then rec.part:Destroy() end
-                            table.remove(itemEspParts, i)
-                        end
-                    end
-                    task.wait(0.5)
-                end
-                clearItemESP()
-            end)
-        end
-    end,
-})
 -- END NEW ESP TAB SECTION --------------------------------------------------
 
--- Disable original Item/Entity ESP toggles
--- (legacy ESP section removed)
+-- Combat Tab and Kill Aura Implementation
+local CombatTab = Window:CreateTab("Combat", 4483362458)
 
--- Scanner Tab: Explore and dump game objects
--- (scanner section removed)
+-- Variables for Kill Aura
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local DamageEvent = ReplicatedStorage.RemoteEvents.ToolDamageObject
+local Characters = workspace.Characters
 
--- CharacterAdded handling (moved outside Kill Aura block)
+-- Configuration
+local Config = {
+    Enabled = false,
+    Range = 30,
+    AttackDelay = 0.1,
+    CurrentAmount = 0,
+    ActiveTargets = {}
+}
+
+-- Toggle for KillAura
+CombatTab:CreateToggle({
+    Name = "KillAura",
+    CurrentValue = false,
+    Flag = "KillAuraEnabled",
+    Callback = function(Value)
+        Config.Enabled = Value
+        if Value then
+            StartKillAura()
+        else
+            Config.ActiveTargets = {}
+        end
+    end,
+})
+
+-- Slider for Range
+CombatTab:CreateSlider({
+    Name = "Range",
+    Range = {1, 100},
+    Increment = 5,
+    Suffix = "Studs",
+    CurrentValue = 30,
+    Flag = "KillAuraRange",
+    Callback = function(Value)
+        Config.Range = Value
+    end,
+})
+
+-- Slider for Attack Speed
+CombatTab:CreateSlider({
+    Name = "Attack Speed",
+    Range = {0.05, 1},
+    Increment = 0.05,
+    Suffix = "Seconds",
+    CurrentValue = 0.1,
+    Flag = "AttackDelay",
+    Callback = function(Value)
+        Config.AttackDelay = Value
+    end,
+})
+
+-- Optimized target validation
+local function isValidTarget(character)
+    return character and character:IsA("Model")
+end
+
+-- Optimized damage function
+local function DamageTarget(target)
+    -- List of weapons to try in order of preference
+    local weapons = {
+        "Morningstar",
+        "Good Axe",
+        "Spear",
+        "Old Axe"
+    }
+    
+    -- Try each weapon in order
+    local weaponToUse = nil
+    for _, weapon in ipairs(weapons) do
+        if LocalPlayer.Inventory:FindFirstChild(weapon) then
+            weaponToUse = LocalPlayer.Inventory[weapon]
+            break
+        end
+    end
+    
+    -- If no weapon found, return
+    if not weaponToUse then return end
+    
+    Config.CurrentAmount = Config.CurrentAmount + 1
+    DamageEvent:InvokeServer(
+        target,
+        weaponToUse,
+        tostring(Config.CurrentAmount) .. "_7367831688",
+        CFrame.new(-2.962610244751, 4.5547881126404, -75.950843811035, 0.89621275663376, -1.3894891459643e-08, 0.44362446665764, -7.994568895775e-10, 1, 3.293635941759e-08, -0.44362446665764, -2.9872644802253e-08, 0.89621275663376)
+    )
+end
+
+-- Optimized attack loop
+local function AttackLoop(target)
+    if not Config.ActiveTargets[target] then
+        Config.ActiveTargets[target] = true
+        task.spawn(function()
+            while target and Config.Enabled and Config.ActiveTargets[target] do
+                DamageTarget(target)
+                task.wait(Config.AttackDelay)
+            end
+        end)
+    end
+end
+
+-- Main KillAura function
+function StartKillAura()
+    task.spawn(function()
+        while Config.Enabled do
+            local playerRoot = LocalPlayer.Character and LocalPlayer.Character.PrimaryPart
+            if playerRoot then
+                for _, target in ipairs(Characters:GetChildren()) do
+                    if not Config.Enabled then break end
+                    if isValidTarget(target) then
+                        local targetPart = target.PrimaryPart or target:FindFirstChild("HitBox")
+                        if targetPart and (targetPart.Position - playerRoot.Position).Magnitude <= Config.Range then
+                            AttackLoop(target)
+                        else
+                            Config.ActiveTargets[target] = nil
+                        end
+                    end
+                end
+            end
+            task.wait(0.1)
+        end
+    end)
+end
+
+-- CharacterAdded handling
 LocalPlayer.CharacterAdded:Connect(function(char)
     local humanoid = char:WaitForChild("Humanoid")
     humanoid.WalkSpeed = SpeedToggle.CurrentValue and FAST_WALK_SPEED or DEFAULT_WALK_SPEED
     humanoid.JumpPower = DEFAULT_JUMP_POWER
 end)
-
-local RS = game:GetService("ReplicatedStorage")
