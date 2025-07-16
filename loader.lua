@@ -8,26 +8,16 @@ local Window = Rayfield:CreateWindow({
         Enabled = true,
         FolderName = "H4cks.hub",
         FileName = "H4cks.hub"
-    },
-    Discord = {
-        Enabled = false,
-        Invite = "getswiftgg",
-        RememberJoins = false
-    },
-    KeySystem = true,
-    KeySettings = {
-        Title = "H4cks.hub",
-        Subtitle = "Key System",
-        Note = "Join our Discord (https://discord.gg/BnPXzFhYbB) to obtain the key",
-        FileName = "H4cksKey",
-        SaveKey = true,
-        GrabKeyFromSite = false,
-        Key = {"Hello"}
     }
-})  -- end Rayfield:CreateWindow call
--- Clipboard copy on load (removed)
-print("[H4cks.hub] Join our Discord: https://discord.gg/BnPXzFhYbB")
-Rayfield:Notify({Title = "Discord", Content = "Invite link printed to console (F9)", Duration = 5})
+})
+
+-- Print discord link and notify
+print("[H4cks.hub] Join our Discord for extra features and more games: https://discord.gg/BnPXzFhYbB")
+Rayfield:Notify({
+    Title = "H4cks.hub",
+    Content = "Join our Discord for extra features! (Link in F9)",
+    Duration = 5
+})
 
 local PlayerTab = Window:CreateTab("Player", "user")
 local ItemTab = Window:CreateTab("Items", "package")
