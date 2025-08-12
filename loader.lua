@@ -9,6 +9,16 @@ local Window = Rayfield:CreateWindow({
         FolderName = "H4cks.hub",
         FileName = "H4cks.hub"
     },
+    KeySystem = true,
+    KeySettings = {
+        Title = "H4cks.hub",
+        Subtitle = "Key System",
+        Note = "Key in discord.",
+        FileName = "H4cks.hub-Key",
+        SaveKey = true,
+        GrabKeyFromSite = false,
+        Key = {"99Nights"}
+    },
     Theme = "Default"
 })
 
@@ -975,6 +985,87 @@ function StartKillAura()
         end
     end)
 end
+
+-- Auto Cut Trees Feature
+local AutoCutConfig = {
+    Enabled = false,
+    AttackDelay = 0.15,
+    CurrentAmount = 0,
+    ActiveTargets = {}
+}
+
+local function getBestAxe()
+    local axes = {"Good Axe", "Old Axe"}
+    for _, axe in ipairs(axes) do
+        if LocalPlayer.Inventory:FindFirstChild(axe) then
+            return LocalPlayer.Inventory[axe]
+        end
+    end
+    return nil
+end
+
+local function DamageTree(tree)
+    local axe = getBestAxe()
+    if not axe then return end
+    AutoCutConfig.CurrentAmount = AutoCutConfig.CurrentAmount + 1
+    DamageEvent:InvokeServer(
+        tree,
+        axe,
+        tostring(AutoCutConfig.CurrentAmount) .. "_8937798360",
+        tree.PrimaryPart and tree.PrimaryPart.CFrame or CFrame.new()
+    )
+end
+
+local function TreeAttackLoop(tree)
+    if not AutoCutConfig.ActiveTargets[tree] then
+        AutoCutConfig.ActiveTargets[tree] = true
+        task.spawn(function()
+            while tree and tree.Parent and AutoCutConfig.Enabled and AutoCutConfig.ActiveTargets[tree] do
+                DamageTree(tree)
+                task.wait(AutoCutConfig.AttackDelay)
+            end
+            AutoCutConfig.ActiveTargets[tree] = nil
+        end)
+    end
+end
+
+function StartAutoCutTrees()
+    task.spawn(function()
+        while AutoCutConfig.Enabled do
+            local map = workspace:FindFirstChild("Map")
+            local foliage = map and map:FindFirstChild("Foliage")
+            if foliage then
+                local function scanForTrees(parent)
+                    for _, obj in ipairs(parent:GetChildren()) do
+                        if obj:IsA("Model") and obj.Name == "Small Tree" and obj.PrimaryPart then
+                            TreeAttackLoop(obj)
+                        elseif obj:IsA("Folder") or obj:IsA("Model") then
+                            scanForTrees(obj)
+                        end
+                    end
+                end
+                scanForTrees(foliage)
+            end
+            task.wait(0.2)
+        end
+        -- Cleanup
+        AutoCutConfig.ActiveTargets = {}
+    end)
+end
+
+CombatTab:CreateToggle({
+    Name = "Auto Cut Trees",
+    CurrentValue = false,
+    Flag = "AutoCutTreesEnabled",
+    Callback = function(Value)
+        AutoCutConfig.Enabled = Value
+        if Value then
+            StartAutoCutTrees()
+        else
+            AutoCutConfig.ActiveTargets = {}
+        end
+    end,
+})
 
 -- CharacterAdded handling
 LocalPlayer.CharacterAdded:Connect(function(char)
